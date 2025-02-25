@@ -82,6 +82,7 @@ public class MazeGenerator : MonoBehaviour
         }
 
 
+
         if ((x - 1) >= 0)
         {
             var cellToLeft = mazeLevel[x - 1, z];
