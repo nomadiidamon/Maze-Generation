@@ -456,10 +456,27 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mazeCell: {fileID: 7488442178884251459, guid: c545e23eb9c2b8f48a3cb37d9e8a30f6, type: 3}
-  mazeWidth: 3
-  mazeDepth: 3
+  mazeWidth: 10
+  mazeDepth: 10
   mazeHeight: 1
-  mazePrefabScale: 1
+  minXScale: 1
+  minYScale: 1
+  minZScale: 1
+  mazePrefabScale: {x: 1, y: 1, z: 1}
+  boundaryCellColor: {r: 0.17254902, g: 0.36078432, b: 0.6666667, a: 0}
+  minWallPercent: 0.145
+  maxIsolatedCells: 0.25
+  changeBoundaryCellColor: 1
+  enableTopDownView: 1
+  totalCells: 0
+  boundaryCells: []
+  boundaryCellsCount: 0
+  innerCells: 0
+  unvisitedCells: 0
+  generationInProgress: 0
+  isFinishedRefining: 0
+  isFinishedSolvingBlockages: 0
+  isFinishedAddingBackWalls: 0
 --- !u!4 &1389182343
 Transform:
   m_ObjectHideFlags: 0
@@ -469,7 +486,7 @@ Transform:
   m_GameObject: {fileID: 1389182341}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.000000059604645, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

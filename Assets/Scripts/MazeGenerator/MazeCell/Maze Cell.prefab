@@ -553,7 +553,7 @@ Transform:
   m_GameObject: {fileID: 3983559691561456568}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0.7071068, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0.35, z: 0}
+  m_LocalPosition: {x: 0, y: 0.4, z: 0}
   m_LocalScale: {x: 0.19999997, y: 1, z: 1.1999999}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -731,9 +731,12 @@ MonoBehaviour:
   RightWall: {fileID: 1853757223990479932}
   FrontWall: {fileID: 6593624903645269844}
   BackWall: {fileID: 7765683677025989086}
-  Cieling: {fileID: 5745737478751942902}
+  Ceiling: {fileID: 5745737478751942902}
   Floor: {fileID: 8560948066097404115}
   UnvisitedCell: {fileID: 2479574530987780489}
+  isBoundaryCell: 0
+  boundaryWalls: []
+  remainingWalls: []
 --- !u!1 &7765683677025989086
 GameObject:
   m_ObjectHideFlags: 0
@@ -793,7 +796,7 @@ Transform:
   m_GameObject: {fileID: 8053428069448290306}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0.7071068, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: -0.35, z: 0}
+  m_LocalPosition: {x: 0, y: -0.4, z: 0}
   m_LocalScale: {x: 0.19999997, y: 1, z: 1.1999999}
   m_ConstrainProportionsScale: 0
   m_Children: []
