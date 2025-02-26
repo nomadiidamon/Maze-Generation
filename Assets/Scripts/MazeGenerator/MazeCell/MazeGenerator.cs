@@ -5,33 +5,50 @@ using UnityEngine;
 
 public class MazeGenerator : MonoBehaviour
 {
+    [Header("Prefabs")]
     [SerializeField] GameObject mazeCell;
+    [SerializeField] public Vector3 mazePrefabScale = new Vector3(1, 1, 1);
     private MazeCell cell;
-    [SerializeField] private int mazeWidth = 10;
-    [SerializeField] private int mazeDepth = 10;
-    [SerializeField] private int mazeHeight = 1;
+    [Header("Prefab Scale Restraints")]
     [SerializeField] private float minXScale = 1;
     [SerializeField] private float minYScale = 1;
     [SerializeField] private float minZScale = 1;
-    [SerializeField] public Vector3 mazePrefabScale = new Vector3(1, 1, 1);
-    [SerializeField] Color boundaryCellColor;
-    [SerializeField][Range(0f, 0.45f)] float minWallPercent = 0.45f;
-    [SerializeField][Range(0f, 0.5f)] float maxIsolatedCells = 0.25f;
 
+    [Header("Maze Dimensions")]
+    [SerializeField] private int mazeWidth = 10;
+    [SerializeField] private int mazeDepth = 10;
+    [SerializeField] private int mazeHeight = 1;
+
+    [Header("Boundary Cell Settings")]
+    [SerializeField] Color boundaryCellColor;
     public bool changeBoundaryCellColor = false;
+
+    [Header("Cell Wall Settings")]
+    [SerializeField][Range(0f, 1f)] float minWallPercent = 0.45f;
+    [SerializeField][Range(0f, 1f)] float maxIsolatedCells = 0.25f;
     public bool enableTopDownView = false;
+
+    [Header("Maze Stats")]
     public int totalCells;
-    public List<MazeCell> boundaryCells = new List<MazeCell>();
     public int boundaryCellsCount;
     public int innerCells;
     public int unvisitedCells;
+    public int isolatedCellsCount;
+    public int startingNumberOfWalls;
+    public int currentNumberOfWalls;
+    public int minNumberOfWalls;
+    public int maxNumberOfIsolatedCells;
+    public List<MazeCell> boundaryCells = new List<MazeCell>();
+    public List<MazeCell> isolatedCells = new List<MazeCell>();
+    public MazeCell[,,] mazeLevel;
     private MazeCell prevCell;
     private MazeCell currCell;
-    public bool generationInProgress = false;
-    public MazeCell[,,] mazeLevel;
+
+    [Header("Generation Statuses")]
     public bool isFinishedRefining = false;
     public bool isFinishedSolvingBlockages = false;
     public bool isFinishedAddingBackWalls = false;
+    public bool generationInProgress = false;
 
 
     private void Start()
@@ -50,6 +67,7 @@ public class MazeGenerator : MonoBehaviour
     public void Initialize()
     {
         totalCells = (mazeWidth * mazeHeight * mazeDepth);
+        startingNumberOfWalls = 0;
         unvisitedCells = totalCells;
         if (mazePrefabScale.x < minXScale || mazePrefabScale.y < minYScale || mazePrefabScale.z < minZScale)
         {
@@ -78,12 +96,14 @@ public class MazeGenerator : MonoBehaviour
             {
                 for (int j = 0; j < mazeDepth; j++)
                 {
-                    Vector3 cellPosition = new Vector3(i * mazePrefabScale.x, k * mazePrefabScale.y, j * mazePrefabScale.z);
+                    Vector3 cellPosition = new Vector3(i, k, j);
                     mazeLevel[i, k, j] = Instantiate(cell, cellPosition, Quaternion.identity);
+                    startingNumberOfWalls += mazeLevel[i, k, j].startingNumberOfCellWalls;
                 }
             }
             transform.position = new Vector3(transform.position.x, (transform.position.y + mazePrefabScale.y), transform.position.z);
         }
+        currentNumberOfWalls = startingNumberOfWalls;
         MarkBoundaryCells();
     }
 
@@ -115,7 +135,7 @@ public class MazeGenerator : MonoBehaviour
 
         bool isBoundary = false;
 
-        if (x == 0 || x == (mazeWidth - 1) * mazePrefabScale.x || y == 0 || y == (mazeHeight - 1) * mazePrefabScale.y || z == 0 || z == (mazeDepth - 1) * mazePrefabScale.z)
+        if (x == 0 || x == (mazeWidth - 1) || y == 0 || y == (mazeHeight - 1) || z == 0 || z == (mazeDepth - 1))
         {
             isBoundary = true;
             MarkBoundaryWalls(cell, x, y, z);
@@ -193,12 +213,47 @@ public class MazeGenerator : MonoBehaviour
         if (isFinishedRefining && !isFinishedSolvingBlockages)
         {
             ReduceBlockages();
+            UpdateMazeStats();
         }
-        if (isFinishedSolvingBlockages && !isFinishedAddingBackWalls)
+    }
+
+    private void UpdateMazeStats()
+    {
+        // Update the number of unvisited cells
+        unvisitedCells = 0;
+        foreach (MazeCell cell in mazeLevel)
         {
-            AddBackWalls();
+            if (!cell.cellWasVisited)
+            {
+                unvisitedCells++;
+            }
         }
 
+        // Update boundary cell count
+        boundaryCellsCount = boundaryCells.Count;
+
+        // Update isolated cell count
+        isolatedCells.Clear(); // Clear the previous isolated cells list
+        foreach (MazeCell cell in mazeLevel)
+        {
+            if (cell.remainingWalls.Count >= 4)
+            {
+                if (cell.hasRightWall && cell.hasLeftWall && cell.hasFrontWall && cell.hasBackWall)
+                {
+                    isolatedCells.Add(cell);
+                }
+            }
+        }
+
+        isolatedCellsCount = isolatedCells.Count;
+
+        // Update number of walls (assuming walls are being removed or restored)
+        int wallCount = 0;
+        foreach (MazeCell cell in mazeLevel)
+        {
+            wallCount += cell.remainingWalls.Count;
+        }
+        currentNumberOfWalls = wallCount;
     }
 
     private void GenerateStep()
@@ -253,76 +308,57 @@ public class MazeGenerator : MonoBehaviour
 
     public bool RefineMaze()
     {
-        List<MazeCell> innerCells = new List<MazeCell>();
-
         foreach (MazeCell cell in mazeLevel)
         {
-            cell.DeleteRandomRemainingWall(mazeHeight);
+            if (cell.DeleteRandomRemainingWall(mazeHeight))
+            {
+                currentNumberOfWalls -= 1;
+            }
         }
-
-
 
         int wallCount = 0;
         foreach (MazeCell cell in mazeLevel)
         {
             cell.RemoveBoundaryWallsFromRemainingWalls();
-            foreach (GameObject wall in cell.remainingWalls)
-            {
-                wallCount += cell.numOfWalls;
-            }
+            wallCount += cell.remainingWalls.Count;
         }
-
-        if (wallCount <= (int)((float)totalCells) / minWallPercent)
+        minNumberOfWalls = (int)((float)totalCells * minWallPercent);
+        if (wallCount >= minNumberOfWalls)
         {
             isFinishedRefining = true;
             Debug.Log("Maze has been refined");
         }
-
         return isFinishedRefining;
     }
 
     public void ReduceBlockages()
     {
         isFinishedSolvingBlockages = false;
-
         // get the isolated cells
-        List<MazeCell> isolatedCells = new List<MazeCell>();
         foreach (MazeCell cell in mazeLevel)
         {
-            if (cell.remainingWalls.Count == cell.numOfWalls)
+            if (cell.remainingWalls.Count >= 4)
             {
-                isolatedCells.Add(cell);
-                cell.DeleteRandomRemainingWall(mazeHeight);
+                if (cell.hasRightWall && cell.hasLeftWall && cell.hasFrontWall && cell.hasBackWall)
+                {
+                    isolatedCells.Add(cell);
+                    if (cell.DeleteRandomRemainingWall(mazeHeight))
+                    {
+                        currentNumberOfWalls -= 1;
+                    }
+                }
             }
         }
 
-        // calculate the number of isolated cells to remove
-        int numIsolatedCellsToRemove = (int)(maxIsolatedCells * totalCells);
+        isolatedCellsCount = isolatedCells.Count;
+        maxNumberOfIsolatedCells = (int)(maxIsolatedCells * totalCells);
 
-        // select a random isolated cell
-        int randomCellIndex = Random.Range(0, isolatedCells.Count);
-
-        // if the cell is isolated, remove a random wall
-        isolatedCells[randomCellIndex].DeleteRandomRemainingWall(mazeHeight);
-
-
-        isFinishedSolvingBlockages = true;
-    }
-
-    public void AddBackWalls()
-    {
-        isFinishedAddingBackWalls = false;
-
-
-        foreach (MazeCell cell in mazeLevel)
+        if (isolatedCellsCount > maxNumberOfIsolatedCells && isolatedCellsCount !=0)
         {
-            //cell.AddBackWall();
+            int randomCellIndex = Random.Range(0, isolatedCellsCount);
+            isolatedCells[randomCellIndex].DeleteRandomRemainingWall(mazeHeight);
         }
-
-
-
-
-        isFinishedAddingBackWalls = true;
+        isFinishedSolvingBlockages = true;
     }
 
     private void StartMazeGeneration()

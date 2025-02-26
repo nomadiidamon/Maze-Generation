@@ -205,13 +205,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: -10}
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 4, y: 14, z: 4.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
 --- !u!114 &330585547
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -456,27 +456,33 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mazeCell: {fileID: 7488442178884251459, guid: c545e23eb9c2b8f48a3cb37d9e8a30f6, type: 3}
-  mazeWidth: 10
-  mazeDepth: 10
-  mazeHeight: 1
-  minXScale: 1
-  minYScale: 1
-  minZScale: 1
   mazePrefabScale: {x: 1, y: 1, z: 1}
+  minXScale: 0.5
+  minYScale: 0.5
+  minZScale: 0.5
+  mazeWidth: 6
+  mazeDepth: 5
+  mazeHeight: 1
   boundaryCellColor: {r: 0.17254902, g: 0.36078432, b: 0.6666667, a: 0}
-  minWallPercent: 0.145
-  maxIsolatedCells: 0.25
   changeBoundaryCellColor: 1
+  minWallPercent: 0.25
+  maxIsolatedCells: 1
   enableTopDownView: 1
   totalCells: 0
-  boundaryCells: []
   boundaryCellsCount: 0
   innerCells: 0
   unvisitedCells: 0
-  generationInProgress: 0
+  isolatedCellsCount: 0
+  startingNumberOfWalls: 0
+  currentNumberOfWalls: 0
+  minNumberOfWalls: 0
+  maxNumberOfIsolatedCells: 0
+  boundaryCells: []
+  isolatedCells: []
   isFinishedRefining: 0
   isFinishedSolvingBlockages: 0
   isFinishedAddingBackWalls: 0
+  generationInProgress: 0
 --- !u!4 &1389182343
 Transform:
   m_ObjectHideFlags: 0
