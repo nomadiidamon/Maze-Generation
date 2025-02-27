@@ -108,6 +108,7 @@ public class MazeCell : MonoBehaviour
 
     /// Marks the cell as visited
     [SerializeField] public GameObject UnvisitedCell;
+    [SerializeField] private Transform unvistedCellSize;
     public bool cellWasVisited { get; private set; }
     public void Visit()
     {
@@ -120,9 +121,16 @@ public class MazeCell : MonoBehaviour
     public List<GameObject> boundaryWalls = new List<GameObject>();
     public List<GameObject> remainingWalls = new List<GameObject>();
     public List<GameObject> destroyedWalls = new List<GameObject>();
+    public List<MazeCell> neighboringCells = new List<MazeCell>();
+    public BoxCollider cellCollider;
+    private Vector3 unvisitedCellScale;
+    public int sharedWallCount = 0;
 
     private void Awake()
     {
+        cellCollider = GetComponent<BoxCollider>();
+        unvisitedCellScale = unvistedCellSize.lossyScale;
+        cellCollider.size = new Vector3(unvisitedCellScale.x + .8f, unvisitedCellScale.y + .8f, unvisitedCellScale.z + .8f);
         cellWasVisited = false;
         boundaryWalls.Clear();
         remainingWalls.Clear();
@@ -260,4 +268,5 @@ public class MazeCell : MonoBehaviour
         }
 
     }
+
 }

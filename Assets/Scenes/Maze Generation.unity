@@ -206,7 +206,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 4, y: 14, z: 4.5}
+  m_LocalPosition: {x: 4, y: 45, z: 25}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -455,19 +455,32 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 079d66a6bb17e434eaaff2a8e66fa52f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  mazeWidth: 10
+  mazeDepth: 10
+  mazeHeight: 2
+  generationSpeed: 10
+  trapCellChance: 0.1
+  treasureCellChance: 0.1
+  enemyCellChance: 0.1
+  powerUpCellChance: 0.1
+  healthCellChance: 0.1
+  ammoCellChance: 0.1
+  weaponCellChance: 0.1
+  armorCellChance: 0.1
+  keyCellChance: 0.1
+  doorCellChance: 0.1
+  breakableSurfaceChance: 0.1
+  startOnBoundary: 1
+  maxWallPercent: 1.467
+  maxIsolatedCells: 0.662
+  enableTopDownView: 1
   mazeCell: {fileID: 7488442178884251459, guid: c545e23eb9c2b8f48a3cb37d9e8a30f6, type: 3}
   mazePrefabScale: {x: 1, y: 1, z: 1}
   minXScale: 0.5
   minYScale: 0.5
   minZScale: 0.5
-  mazeWidth: 6
-  mazeDepth: 5
-  mazeHeight: 1
   boundaryCellColor: {r: 0.17254902, g: 0.36078432, b: 0.6666667, a: 0}
   changeBoundaryCellColor: 1
-  minWallPercent: 0.25
-  maxIsolatedCells: 1
-  enableTopDownView: 1
   totalCells: 0
   boundaryCellsCount: 0
   innerCells: 0
@@ -475,14 +488,18 @@ MonoBehaviour:
   isolatedCellsCount: 0
   startingNumberOfWalls: 0
   currentNumberOfWalls: 0
-  minNumberOfWalls: 0
+  maxNumberOfWalls: 0
   maxNumberOfIsolatedCells: 0
   boundaryCells: []
   isolatedCells: []
+  mazeParentObject: {fileID: 0}
   isFinishedRefining: 0
   isFinishedSolvingBlockages: 0
   isFinishedAddingBackWalls: 0
   generationInProgress: 0
+  mazeIsFinished: 0
+  totalGenerationTime: 0
+  finalTime: 0
 --- !u!4 &1389182343
 Transform:
   m_ObjectHideFlags: 0
