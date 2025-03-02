@@ -5,14 +5,13 @@ using UnityEngine;
 
 public class MazeGenerator : MonoBehaviour
 {
-
     [Header("Maze Dimensions")]
     [SerializeField] private int mazeWidth = 10;
     [SerializeField] private int mazeDepth = 10;
     [SerializeField] private int mazeHeight = 1;
     [SerializeField] private float generationSpeed = 0.1f;
 
-    [Header("Maze Level Settings")]
+    [Header("Level Settings")]
     [SerializeField] private float trapCellChance = 0.1f;
     [SerializeField] private float treasureCellChance = 0.1f;
     [SerializeField] private float enemyCellChance = 0.1f;
@@ -27,36 +26,30 @@ public class MazeGenerator : MonoBehaviour
     [SerializeField] private bool startOnBoundary = false;
 
     [Header("Cell Wall Settings")]
-    [SerializeField][Range(0.5f, 1.5f)] float maxWallPercent = 0.45f;
-    [SerializeField][Range(0f, 1f)] float maxIsolatedCells = 0.25f;
+    [SerializeField][Range(0.15f, 1.0f)] float maxWallPercent = 0.45f;
     public bool enableTopDownView = false;
 
     [Header("Prefabs")]
     [SerializeField] GameObject mazeCell;
-    [SerializeField] public Vector3 mazePrefabScale = new Vector3(1, 1, 1);
-
-    [Header("Prefab Scale Restraints")]
-    [SerializeField] private float minXScale = 1;
-    [SerializeField] private float minYScale = 1;
-    [SerializeField] private float minZScale = 1;
+    [SerializeField] private float mazeWallHeight = 1.0f;
+    private Vector3 mazePrefabScale = new Vector3(1, 1, 1);
+    [SerializeField] MazeTester tester;
 
     [Header("Boundary Cell Settings")]
     [SerializeField] Color boundaryCellColor;
     public bool changeBoundaryCellColor = false;
-
 
     [Header("Maze Stats")]
     public int totalCells;
     public int boundaryCellsCount;
     public int innerCells;
     public int unvisitedCells;
-    public int isolatedCellsCount;
     public int startingNumberOfWalls;
     public int currentNumberOfWalls;
     public int maxNumberOfWalls;
-    public int maxNumberOfIsolatedCells;
     public List<MazeCell> boundaryCells = new List<MazeCell>();
-    public List<MazeCell> isolatedCells = new List<MazeCell>();
+    public List<MazeBarrier> boundaryWalls = new List<MazeBarrier>();
+    public List<MazeCell> innerCellsList = new List<MazeCell>();
     public MazeCell[,,] mazeLevel;
     public Maze mazeParentObject;
     private MazeCell prevCell;
@@ -64,8 +57,8 @@ public class MazeGenerator : MonoBehaviour
 
     [Header("Generation Statuses")]
     public bool isFinishedRefining = false;
+    public bool wallCountMet = false;
     public bool isFinishedSolvingBlockages = false;
-    public bool isFinishedAddingBackWalls = false;
     public bool generationInProgress = false;
     public bool mazeIsFinished = false;
     [SerializeField] private float totalGenerationTime;
@@ -80,17 +73,18 @@ public class MazeGenerator : MonoBehaviour
         {
             foreach (MazeCell cell in mazeLevel)
             {
-                cell.DestroyCeiling();
+                cell.DestroyBarrier(cell.Ceiling);
+                if (cell.Ceiling.isBoundaryBarrier)
+                {
+                    cell.Ceiling.DestroyBoundaryBarrier();
+                }
             }
         }
-
     }
 
     public void Initialize()
     {
-
         totalGenerationTime = 0;
-
         totalCells = (mazeWidth * mazeHeight * mazeDepth);
         mazeParentObject = Maze.CreateMaze(totalCells, trapCellChance, treasureCellChance, enemyCellChance,
             powerUpCellChance, healthCellChance, ammoCellChance, weaponCellChance, armorCellChance,
@@ -98,26 +92,7 @@ public class MazeGenerator : MonoBehaviour
 
         startingNumberOfWalls = 0;
         unvisitedCells = totalCells;
-        maxNumberOfWalls = (int)((float)totalCells * maxWallPercent);
-
-        if (mazePrefabScale.x < minXScale || mazePrefabScale.y < minYScale || mazePrefabScale.z < minZScale)
-        {
-            if (mazePrefabScale.x < 1)
-            {
-                mazePrefabScale.x = minXScale;
-                Debug.LogError("Maze prefab X scale must be greater than 1");
-            }
-            if (mazePrefabScale.y < 0.5)
-            {
-                mazePrefabScale.y = minYScale;
-                Debug.LogError("Maze prefab Y scale must be greater than 0.5");
-            }
-            if (mazePrefabScale.z < 1)
-            {
-                mazePrefabScale.z = minZScale;
-                Debug.LogError("Maze prefab Z scale must be greater than 1");
-            }
-        }
+        mazePrefabScale.y = mazeWallHeight;
         mazeCell.transform.localScale = mazePrefabScale;
         MazeCell cell = mazeCell.GetComponent<MazeCell>();
 
@@ -128,19 +103,20 @@ public class MazeGenerator : MonoBehaviour
             {
                 for (int j = 0; j < mazeDepth; j++)
                 {
-                    Vector3 cellPosition = new Vector3(i, k, j);
+                    Vector3 cellPosition = new Vector3(i * mazePrefabScale.x, k * mazePrefabScale.y, j * mazePrefabScale.z);
                     mazeLevel[i, k, j] = Instantiate(cell, cellPosition, Quaternion.identity);
                     mazeLevel[i, k, j].transform.parent = mazeParentObject.transform;
                     mazeParentObject.cells.Add(mazeLevel[i, k, j]);
                     startingNumberOfWalls += mazeLevel[i, k, j].startingNumberOfCellWalls;
                 }
             }
-            transform.position = new Vector3(transform.position.x, (transform.position.y + mazePrefabScale.y), transform.position.z);
+            transform.position = new Vector3(transform.position.x, transform.position.y + 1, transform.position.z);
         }
         currentNumberOfWalls = startingNumberOfWalls;
+        maxNumberOfWalls = (int)((float)currentNumberOfWalls * maxWallPercent);
         MarkBoundaryCells();
         mazeParentObject.boudaryCells = boundaryCells;
-        mazeParentObject.SignalToStart(true);
+        maxNumberOfWalls += boundaryWalls.Count;
     }
 
     public void MarkBoundaryCells()
@@ -168,67 +144,63 @@ public class MazeGenerator : MonoBehaviour
         int x = (int)(cell.transform.position.x);
         int y = (int)(cell.transform.position.y);
         int z = (int)(cell.transform.position.z);
-
         bool isBoundary = false;
-
         if (x == 0 || x == (mazeWidth - 1) || y == 0 || y == (mazeHeight - 1) || z == 0 || z == (mazeDepth - 1))
         {
             isBoundary = true;
-            MarkBoundaryWalls(cell, x, y, z);
+            MarkBoundaryWalls(cell, (x), (y), (z));
         }
-
         StoreNeighboringCells(cell);
-
         return isBoundary;
     }
 
-
-    public void MarkBoundaryWalls(MazeCell cell, int x, int y, int z)
+    public void MarkBoundaryWalls(MazeCell cell, float x, float y, float z)
     {
-
-
-        // Mark boundaries based on the position of the cell, taking scaling into account
         if (x <= 0)
         {
-            cell.boundaryWalls.Add(cell.RightWall);
-            cell.RightWall.SetActive(true);
-            cell.RightWall.GetComponentInChildren<Renderer>().material.color = boundaryCellColor;
-        }
-        if (x >= (mazeWidth - 1) * mazePrefabScale.x)
-        {
             cell.boundaryWalls.Add(cell.LeftWall);
-            cell.LeftWall.SetActive(true);
-            cell.LeftWall.GetComponentInChildren<Renderer>().material.color = boundaryCellColor;
+            cell.LeftWall.GetComponentInChildren<MeshRenderer>().material.color = boundaryCellColor;
+            cell.LeftWall.isBoundaryBarrier = true;
+            boundaryWalls.Add(cell.LeftWall);
+        }
+        if (x >= (mazeWidth - 1))
+        {
+            cell.boundaryWalls.Add(cell.RightWall);
+            cell.RightWall.GetComponentInChildren<MeshRenderer>().material.color = boundaryCellColor;
+            cell.RightWall.isBoundaryBarrier = true;
+            boundaryWalls.Add(cell.RightWall);
         }
         if (z <= 0)
         {
             cell.boundaryWalls.Add(cell.BackWall);
-            cell.BackWall.SetActive(true);
-            cell.BackWall.GetComponentInChildren<Renderer>().material.color = boundaryCellColor;
+            cell.BackWall.GetComponentInChildren<MeshRenderer>().material.color = boundaryCellColor;
+            cell.BackWall.isBoundaryBarrier = true;
+            boundaryWalls.Add(cell.BackWall);
         }
-        if (z >= (mazeDepth - 1) * mazePrefabScale.z)
+        if (z >= (mazeDepth - 1))
         {
             cell.boundaryWalls.Add(cell.FrontWall);
-            cell.FrontWall.SetActive(true);
-            cell.FrontWall.GetComponentInChildren<Renderer>().material.color = boundaryCellColor;
+            cell.FrontWall.GetComponentInChildren<MeshRenderer>().material.color = boundaryCellColor;
+            cell.FrontWall.isBoundaryBarrier = true;
+            boundaryWalls.Add(cell.FrontWall);
         }
-
         if (mazeHeight > 1)
         {
             if (y <= 0)
             {
                 cell.boundaryWalls.Add(cell.Floor);
-                cell.Floor.SetActive(true);
-                cell.Floor.GetComponentInChildren<Renderer>().material.color = boundaryCellColor;
+                cell.Floor.GetComponentInChildren<MeshRenderer>().material.color = boundaryCellColor;
+                cell.Floor.isBoundaryBarrier = true;
+                boundaryWalls.Add(cell.Floor);
             }
-            if (y >= (mazeHeight - 1) * mazePrefabScale.y)
+            if (y >= (mazeHeight - 1))
             {
                 cell.boundaryWalls.Add(cell.Ceiling);
-                cell.Ceiling.SetActive(true);
-                cell.Ceiling.GetComponentInChildren<Renderer>().material.color = boundaryCellColor;
+                cell.Ceiling.GetComponentInChildren<MeshRenderer>().material.color = boundaryCellColor;
+                cell.Ceiling.isBoundaryBarrier = true;
+                boundaryWalls.Add(cell.Ceiling);
             }
         }
-
         cell.isBoundaryCell = (cell.boundaryWalls.Count > 0);
     }
 
@@ -238,6 +210,9 @@ public class MazeGenerator : MonoBehaviour
         {
             finalTime = totalGenerationTime;
             Time.timeScale = 1;
+            mazeParentObject.SignalToStart();
+            Debug.Log("Final Generation Time: " + finalTime);
+            Destroy(gameObject);
             return;
         }
         else
@@ -262,32 +237,32 @@ public class MazeGenerator : MonoBehaviour
                     ReduceBlockages();
                     UpdateMazeStats();
                 }
-                if (currentNumberOfWalls >= maxNumberOfWalls)
+            }
+            else if (isFinishedRefining && !isFinishedSolvingBlockages)
+            {
+                UpdateMazeStats();
+                ReduceBlockages();
+                if (isFinishedSolvingBlockages && currentNumberOfWalls <= maxNumberOfWalls)
                 {
-                    foreach (MazeCell cell in mazeLevel)
-                    {
-                        if (currentNumberOfWalls <= maxNumberOfWalls)
-                        {
-                            mazeIsFinished = true;
-                            return;
-                        }
-                        if (cell.DeleteRandomRemainingWall(mazeHeight))
-                        {
-                            currentNumberOfWalls -= 1;
-                        }
-
-                    }
+                    mazeIsFinished = true;
+                }
+                else
+                {
+                    UpdateMazeStats();
+                    ReduceBlockages();
+                    UpdateMazeStats();
 
                 }
-
             }
         }
-
+        if (isFinishedSolvingBlockages && isFinishedRefining && wallCountMet)
+        {
+            mazeIsFinished = true;
+        }
     }
 
     private void UpdateMazeStats()
     {
-        // Update the number of unvisited cells
         unvisitedCells = 0;
         foreach (MazeCell cell in mazeLevel)
         {
@@ -296,26 +271,7 @@ public class MazeGenerator : MonoBehaviour
                 unvisitedCells++;
             }
         }
-
-        // Update boundary cell count
         boundaryCellsCount = boundaryCells.Count;
-
-        // Update isolated cell count
-        isolatedCells.Clear(); // Clear the previous isolated cells list
-        foreach (MazeCell cell in mazeLevel)
-        {
-            if (cell.remainingWalls.Count >= 4)
-            {
-                if (cell.hasRightWall && cell.hasLeftWall && cell.hasFrontWall && cell.hasBackWall)
-                {
-                    isolatedCells.Add(cell);
-                }
-            }
-        }
-
-        isolatedCellsCount = isolatedCells.Count;
-
-        // Update number of walls (assuming walls are being removed or restored)
         int wallCount = 0;
         foreach (MazeCell cell in mazeLevel)
         {
@@ -327,13 +283,10 @@ public class MazeGenerator : MonoBehaviour
     private IEnumerator GenerateStep()
     {
         yield return new WaitForSeconds(0.05f);
-
         MazeCell nextCell = GetNextUnvisitedNeighbor(currCell);
-
         if (nextCell != null)
         {
             ClearWalls(prevCell, currCell);
-
             prevCell = currCell;
             currCell = nextCell;
             currCell.Visit();
@@ -341,8 +294,6 @@ public class MazeGenerator : MonoBehaviour
         }
         else
         {
-
-
             foreach (MazeCell cell in mazeLevel)
             {
                 if (cell.cellWasVisited == true && unvisitedCells == 0)
@@ -358,31 +309,11 @@ public class MazeGenerator : MonoBehaviour
                 }
                 else { yield return null; }
             }
-
-
-            //Debug.Log("Current Cell has no unvisted neighbors. Finding remaining unvisited cells...");
-            //for (int i = 0; i < mazeWidth; i++)
-            //{
-            //    for (int j = 0; j < mazeDepth; j++)
-            //    {
-            //        for (int k = 0; k < mazeHeight; k++)
-            //        {
-            //            if ((mazeLevel[i, k, j].cellWasVisited == false))
-            //            {
-            //                mazeLevel[i, k, j].Visit();
-            //                unvisitedCells -= 1;
-            //            }
-            //        }
-            //    }
-            //}
-
-
         }
     }
 
     public bool RefineMaze()
     {
-
         foreach (MazeCell cell in mazeLevel)
         {
             if (currentNumberOfWalls <= maxNumberOfWalls)
@@ -396,11 +327,9 @@ public class MazeGenerator : MonoBehaviour
                 currentNumberOfWalls -= 1;
             }
         }
-
         int wallCount = 0;
         foreach (MazeCell cell in mazeLevel)
         {
-            cell.RemoveBoundaryWallsFromRemainingWalls();
             wallCount += cell.remainingWalls.Count;
         }
         if (wallCount <= maxNumberOfWalls)
@@ -408,81 +337,79 @@ public class MazeGenerator : MonoBehaviour
             isFinishedRefining = true;
             Debug.Log("Maze has been refined");
         }
-
         return isFinishedRefining;
     }
 
     public void ReduceBlockages()
     {
-
-        foreach (MazeCell cell in mazeLevel)
+        if (!wallCountMet)
         {
-            if (currentNumberOfWalls >= maxNumberOfWalls)
+            if (currentNumberOfWalls > maxNumberOfWalls)
             {
-                if (cell.remainingWalls.Count >= 4)
+                int toRemove = currentNumberOfWalls - maxNumberOfWalls;
+                for (int i = 0; i < toRemove; i++)
                 {
-                    if (cell.hasRightWall && cell.hasLeftWall && cell.hasFrontWall && cell.hasBackWall)
+                    int randomX = Random.Range(0, mazeWidth);
+                    int randomY = Random.Range(0, mazeHeight);
+                    int randomZ = Random.Range(0, mazeDepth);
+                    MazeCell cell = mazeLevel[randomX, randomY, randomZ];
+                    if (cell.remainingWalls.Count != 0)
                     {
-                        isolatedCells.Add(cell);
-
-                        if (cell.DeleteRandomRemainingWall(mazeHeight))
-                        {
-                            currentNumberOfWalls -= 1;
-                        }
+                        cell.DeleteRandomRemainingWall(mazeHeight);
+                    }
+                    else
+                    {
+                        i--;
                     }
                 }
             }
+            else if (currentNumberOfWalls <= maxNumberOfWalls)
+            {
+                wallCountMet = true;
+                Debug.Log("Wall Count met.");
+            }
         }
-
-        isolatedCellsCount = isolatedCells.Count;
-        maxNumberOfIsolatedCells = (int)(maxIsolatedCells * totalCells);
-
-        if (isolatedCellsCount > maxNumberOfIsolatedCells && isolatedCellsCount != 0)
+        else
         {
-            if (currentNumberOfWalls >= maxNumberOfWalls)
-            {
-                int randomCellIndex = Random.Range(0, isolatedCellsCount);
-                isolatedCells[randomCellIndex].DeleteRandomRemainingWall(mazeHeight);
-            }
-            else
-            {
-                isFinishedSolvingBlockages = true;
-                Debug.Log("Blockages have been solved");
-            }
+            isFinishedSolvingBlockages = true;
         }
-
     }
 
     public void StoreNeighboringCells(MazeCell cell)
     {
         cell.neighboringCells.Clear();
-
-        foreach (MazeCell _cell in mazeLevel)
+        foreach (MazeCell neighbor in mazeLevel)
         {
-            if (_cell == cell)
+            if (cell == neighbor) continue;
+            Vector3 currPos = cell.transform.position;
+            Vector3 neighborPos = neighbor.transform.position;
+            if (currPos.x == neighborPos.x && neighborPos.z == currPos.z + 1)
             {
-                continue;
+                cell.FrontNeighbor = neighbor;
+                cell.neighboringCells.Add(neighbor);
             }
-            else
+            else if (currPos.x == neighborPos.x && neighborPos.z == currPos.z - 1)
             {
-                if (cell.cellCollider.bounds.Contains(_cell.transform.position))
-                {
-                    if (!cell.neighboringCells.Contains(_cell))
-                    {
-                        cell.neighboringCells.Add(_cell);
-                        continue;
-                    }
-                }
-
+                cell.BackNeighbor = neighbor;
+                cell.neighboringCells.Add(neighbor);
+            }
+            else if (currPos.z == neighborPos.z && neighborPos.x == currPos.x + 1)
+            {
+                cell.RightNeighbor = neighbor;
+                cell.neighboringCells.Add(neighbor);
+            }
+            else if (currPos.z == neighborPos.z && neighborPos.x == currPos.x - 1)
+            {
+                cell.LeftNeighbor = neighbor;
+                cell.neighboringCells.Add(neighbor);
             }
         }
-
     }
 
     private void StartMazeGeneration()
     {
         prevCell = null;
-        currCell = mazeLevel[0, 0, 0]; // Start from the first cell
+        currCell = mazeLevel[0, 0, 0];
         generationInProgress = true;
         currCell.Visit();
         unvisitedCells -= 1;
@@ -494,16 +421,13 @@ public class MazeGenerator : MonoBehaviour
         var unvistedCells = GetUnvisitedCells(currCell);
         int max = unvistedCells.Count();
         return unvistedCells.OrderBy(_ => Random.Range(1, max)).FirstOrDefault();
-
     }
 
     private IEnumerable<MazeCell> GetUnvisitedCells(MazeCell currCell)
     {
-
         int x = (int)(currCell.transform.position.x);
         int y = (int)(currCell.transform.position.y);
         int z = (int)(currCell.transform.position.z);
-
         if ((x + 1) < mazeWidth)
         {
             var cellToRight = mazeLevel[x + 1, y, z];
@@ -520,8 +444,6 @@ public class MazeGenerator : MonoBehaviour
                 yield return cellToLeft;
             }
         }
-
-
         if ((z + 1) < mazeDepth)
         {
             var cellToFront = mazeLevel[x, y, z + 1];
@@ -538,7 +460,6 @@ public class MazeGenerator : MonoBehaviour
                 yield return cellToBack;
             }
         }
-
         if (mazeHeight > 1)
         {
             if (y + 1 < mazeHeight)
@@ -558,85 +479,72 @@ public class MazeGenerator : MonoBehaviour
                 }
             }
         }
-
         int randWidth = Random.Range(0, mazeWidth);
         int randHeight = Random.Range(0, mazeHeight);
         int randDepth = Random.Range(0, mazeDepth);
-
         if (mazeLevel[randWidth, randHeight, randDepth].cellWasVisited == false)
         {
             var cellToVisit = mazeLevel[randWidth, randHeight, randDepth];
             yield return cellToVisit;
         }
-
     }
 
     private void ClearWalls(MazeCell prevCell, MazeCell currCell)
     {
         if (prevCell == null) { return; }
-
         int prevX = (int)(prevCell.transform.position.x);
         int prevY = (int)(prevCell.transform.position.y);
         int prevZ = (int)(prevCell.transform.position.z);
         int currX = (int)(currCell.transform.position.x);
         int currY = (int)(currCell.transform.position.y);
         int currZ = (int)(currCell.transform.position.z);
-
-        // Check the difference in positions and remove walls accordingly
         if (prevX < currX && prevCell.hasRightWall && !prevCell.boundaryWalls.Contains(prevCell.RightWall))
         {
-            prevCell.DestroyRightWall();
-
+            prevCell.DestroyBarrier(prevCell.RightWall);
             if (!currCell.boundaryWalls.Contains(currCell.LeftWall))
             {
-                currCell.DestroyLeftWall();
+                currCell.DestroyBarrier(currCell.LeftWall);
             }
         }
         else if (prevX > currX && prevCell.hasLeftWall && !prevCell.boundaryWalls.Contains(prevCell.LeftWall))
         {
-            prevCell.DestroyLeftWall();
-
+            prevCell.DestroyBarrier(prevCell.LeftWall);
             if (!currCell.boundaryWalls.Contains(currCell.RightWall))
             {
-                currCell.DestroyRightWall();
+                currCell.DestroyBarrier(currCell.RightWall);
             }
         }
         else if (prevZ < currZ && prevCell.hasFrontWall && !prevCell.boundaryWalls.Contains(prevCell.FrontWall))
         {
-            prevCell.DestroyFrontWall();
-
+            prevCell.DestroyBarrier(prevCell.FrontWall);
             if (!currCell.boundaryWalls.Contains(currCell.BackWall))
             {
-                currCell.DestroyBackWall();
+                currCell.DestroyBarrier(currCell.BackWall);
             }
         }
         else if (prevZ > currZ && prevCell.hasBackWall && !prevCell.boundaryWalls.Contains(prevCell.BackWall))
         {
-            prevCell.DestroyBackWall();
-
+            prevCell.DestroyBarrier(prevCell.BackWall);
             if (!currCell.boundaryWalls.Contains(currCell.FrontWall))
             {
-                currCell.DestroyFrontWall();
+                currCell.DestroyBarrier(currCell.FrontWall);
             }
         }
         else if (prevY < currY && prevCell.hasCeiling && !prevCell.boundaryWalls.Contains(prevCell.Ceiling))
         {
-            prevCell.DestroyCeiling();
-
+            prevCell.DestroyBarrier(prevCell.Ceiling);
             if (!currCell.boundaryWalls.Contains(currCell.Floor))
             {
-                currCell.DestroyFloor();
+                currCell.DestroyBarrier(currCell.Floor);
             }
         }
         else if (prevY > currY && prevCell.hasFloor && !prevCell.boundaryWalls.Contains(prevCell.Floor))
         {
-            prevCell.DestroyFloor();
-
+            prevCell.DestroyBarrier(prevCell.Floor);
             if (!currCell.boundaryWalls.Contains(currCell.Ceiling))
             {
-                currCell.DestroyCeiling();
+                currCell.DestroyBarrier(currCell.Ceiling);
             }
         }
     }
-
 }

@@ -206,7 +206,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 4, y: 45, z: 25}
+  m_LocalPosition: {x: 4, y: 15, z: 5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -457,9 +457,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   mazeWidth: 10
   mazeDepth: 10
-  mazeHeight: 2
+  mazeHeight: 1
   generationSpeed: 10
-  trapCellChance: 0.1
+  trapCellChance: 0.05
   treasureCellChance: 0.1
   enemyCellChance: 0.1
   powerUpCellChance: 0.1
@@ -469,33 +469,29 @@ MonoBehaviour:
   armorCellChance: 0.1
   keyCellChance: 0.1
   doorCellChance: 0.1
-  breakableSurfaceChance: 0.1
+  breakableSurfaceChance: 0.2
   startOnBoundary: 1
-  maxWallPercent: 1.467
-  maxIsolatedCells: 0.662
+  maxWallPercent: 0.75
   enableTopDownView: 1
-  mazeCell: {fileID: 7488442178884251459, guid: c545e23eb9c2b8f48a3cb37d9e8a30f6, type: 3}
-  mazePrefabScale: {x: 1, y: 1, z: 1}
-  minXScale: 0.5
-  minYScale: 0.5
-  minZScale: 0.5
+  mazeCell: {fileID: 7488442178884251459, guid: 69a0dc3c00006ae45bb0a7b6edeb2c90, type: 3}
+  mazeWallHeight: 1
+  tester: {fileID: 5039052014731416266, guid: ce87536f0586f37409e6a31856696a1d, type: 3}
   boundaryCellColor: {r: 0.17254902, g: 0.36078432, b: 0.6666667, a: 0}
   changeBoundaryCellColor: 1
   totalCells: 0
   boundaryCellsCount: 0
   innerCells: 0
   unvisitedCells: 0
-  isolatedCellsCount: 0
   startingNumberOfWalls: 0
   currentNumberOfWalls: 0
   maxNumberOfWalls: 0
-  maxNumberOfIsolatedCells: 0
   boundaryCells: []
-  isolatedCells: []
+  boundaryWalls: []
+  innerCellsList: []
   mazeParentObject: {fileID: 0}
   isFinishedRefining: 0
+  wallCountMet: 0
   isFinishedSolvingBlockages: 0
-  isFinishedAddingBackWalls: 0
   generationInProgress: 0
   mazeIsFinished: 0
   totalGenerationTime: 0

@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using Unity.AI.Navigation;
 using UnityEngine;
+using UnityEngine.AI;
 
 public class Maze : MonoBehaviour
 {
@@ -9,6 +11,8 @@ public class Maze : MonoBehaviour
     public bool alterStartAndEndColor = true;
     public Color startingCellColor = Color.green;
     public Color endingCellColor = Color.red;
+    public Color breakableBarrierColor = Color.yellow;
+    public Color trapCellColor = Color.magenta;
     public float trapCellChance = 0.1f;
     public float treasureCellChance = 0.1f;
     public float enemyCellChance = 0.1f;
@@ -21,16 +25,19 @@ public class Maze : MonoBehaviour
     public float doorCellChance = 0.1f;
     public float breakableSurfaceChance = 0.1f;
     public bool startOnBoundary = true;
+    public NavMeshSurface navMeshSurface;
 
     public List<MazeCell> cells = new List<MazeCell>();
     public List<MazeCell> boudaryCells = new List<MazeCell>();
     public List<MazeCell> innerCells = new List<MazeCell>();
     public List<MazeCell> isolatedCells = new List<MazeCell>();
     public List<MazeCell> specialCells = new List<MazeCell>();
-
+    public List<MazeBarrier> breakableBarriers = new List<MazeBarrier>();
     public List<MazeCell> trapCells = new List<MazeCell>();
 
     public bool levelIsReady = false;
+    public bool start = false;
+    public bool hideTopFloor = false;
 
     public static Maze CreateMaze(int totalCells, float trapCellChance = 0.1f, float treasureCellChance = 0.1f, float enemyChance = 0.1f,
         float powerUpChance = 0.1f, float healthCellChance = 0.1f, float ammoCellChance = 0.1f, float weaponCellChance = 0.1f,
@@ -58,42 +65,64 @@ public class Maze : MonoBehaviour
 
     private void Update()
     {
-        if (levelIsReady)
+        if (!start)
         {
             return;
         }
         else
         {
-
+            if (!levelIsReady)
+            {
+                InitializeSpecialCells();
+                levelIsReady = true;
+                InitializeNavMesh();
+                GameObject test = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                test.GetComponent<MeshRenderer>().material.color = breakableBarrierColor;
+                test.transform.localScale = test.transform.localScale / 4;
+                Vector3 spot = new Vector3(startingCell.transform.position.x, startingCell.transform.position.y + startingCell.transform.position.y, startingCell.transform.position.z);
+                Instantiate(test, spot, Quaternion.identity);
+                test.AddComponent<MazeTester>();
+                test.AddComponent<NavMeshAgent>();
+                test.AddComponent<Rigidbody>().useGravity = true;
+                test.GetComponent<MazeTester>().agent = test.GetComponent<NavMeshAgent>();
+            }
         }
-    }
-
-    public bool SignalToStart(bool start)
-    {
-        if (start)
+        if (hideTopFloor)
         {
-            InitializeSpecialCells();
-            return true;
+            foreach (MazeCell cell in cells)
+            {
+                if (cell.transform.position.y > 0)
+                {
+                    cell.gameObject.SetActive(false);
+                }
+            }
         }
         else
         {
-            return false;
+            foreach (MazeCell cell in cells)
+            {
+                if (cell.transform.position.y > 0)
+                {
+                    cell.gameObject.SetActive(true);
+                }
+            }
         }
     }
 
-    public bool ConfirmLevelIsReady()
+    public bool SignalToStart()
     {
-        return levelIsReady;
+        start = true;
+        return start;
     }
 
     public void InitializeSpecialCells()
     {
         specialCells.Clear();
+        InitializeIsolatedCells();
         PickStartAndEndCells();
         InitializeInnerCells();
         InitializeTrapCells();
-        InitializeIsolatedCells();
-
+        InitializeBreakableBarriers();
     }
     public void PickStartAndEndCells()
     {
@@ -103,14 +132,29 @@ public class Maze : MonoBehaviour
         {
             endingCell = GetRandomCell(startOnBoundary);
         }
+        List<MazeCell> neighbors = new List<MazeCell>();
+        foreach (MazeCell cell in startingCell.neighboringCells)
+        {
+            foreach (MazeCell neighbor in cell.neighboringCells)
+            {
+                if (neighbor != startingCell)
+                {
+                    neighbors.Add(neighbor);
+                }
+            }
+        }
+        if (neighbors.Contains(endingCell))
+        {
+            PickStartAndEndCells();
+        }
 
         if (alterStartAndEndColor)
         {
-            foreach (GameObject wall in startingCell.remainingWalls)
+            foreach (MazeBarrier wall in startingCell.remainingWalls)
             {
                 wall.GetComponentInChildren<MeshRenderer>().material.color = startingCellColor;
             }
-            foreach (GameObject wall in endingCell.remainingWalls)
+            foreach (MazeBarrier wall in endingCell.remainingWalls)
             {
                 wall.GetComponentInChildren<MeshRenderer>().material.color = endingCellColor;
             }
@@ -143,123 +187,123 @@ public class Maze : MonoBehaviour
         trapCells.Clear();
         foreach (MazeCell cell in cells)
         {
+            if (cell == startingCell || cell == endingCell) { continue; }
             if (Random.value < trapCellChance)
             {
                 trapCells.Add(cell);
+                cell.isTrapCell = true;
                 specialCells.Add(cell);
+                foreach (MazeBarrier wall in cell.sharerdWalls)
+                {
+                    wall.GetComponentInChildren<MeshRenderer>().material.color = trapCellColor;
+                }
             }
+        }
+    }
+
+    public void InitializeBreakableBarriers()
+    {
+        breakableBarriers.Clear();
+        foreach (MazeCell cell in cells)
+        {
+            if (cell == startingCell || cell == endingCell) { continue; }
+            if (cell.isTrapCell) { continue; }
+            if (Random.value < breakableSurfaceChance)
+            {
+                int randomBarrier = Random.Range(0, cell.remainingWalls.Count);
+                MazeBarrier barrier = cell.remainingWalls[randomBarrier];
+                if (barrier.isBoundaryBarrier)
+                {
+                    continue;
+                }
+                else
+                {
+                    barrier.isBreakableBarrier = true;
+                    barrier.GetComponentInChildren<MeshRenderer>().material.color = breakableBarrierColor;
+                    breakableBarriers.Add(barrier);
+                    specialCells.Add(cell);
+                }
+            }
+
         }
     }
 
     public void InitializeIsolatedCells()
     {
         isolatedCells.Clear();
-
-        //// loop through all of the cells
-        //foreach (MazeCell cell in cells)
-        //{
-        //    //start a count for each cell
-        //    int count = 0;
-        //    // loop through all of the neighboring cells
-        //    foreach (MazeCell neighbor in cell.neighboringCells)
-        //    {
-        //        if (cell.hasLeftWall && neighbor.hasRightWall && (Vector3.Distance(cell.LeftWall.transform.position, neighbor.RightWall.transform.position) <= 0.2))
-        //        {
-        //            count++;
-        //        }
-        //        if (cell.hasRightWall && neighbor.hasLeftWall && (Vector3.Distance(cell.RightWall.transform.position, neighbor.LeftWall.transform.position) <= 0.2))
-        //        {
-        //            count++;
-        //        }
-        //        if (cell.hasFrontWall && neighbor.hasBackWall && (Vector3.Distance(cell.FrontWall.transform.position, neighbor.BackWall.transform.position) <= 0.2))
-        //        {
-        //            count++;
-        //        }
-        //        if (cell.hasBackWall && neighbor.hasFrontWall && (Vector3.Distance(cell.BackWall.transform.position, neighbor.FrontWall.transform.position) <= 0.2))
-        //        {
-        //            count++;
-        //        }
-        //        cell.sharedWallCount = count;
-
-        //        // if the current cell has a left, right, front, and back wall around it, add it to the isolated cells list
-        //        if (count == 4)
-        //        {
-        //            isolatedCells.Add(cell);
-        //        }
-        //    }
-        //    count = 0;
-        //}
-
-        // loop through all of the cells
         foreach (MazeCell cell in cells)
         {
-            //start a count for each cell
-            List<GameObject> leftWalls = new List<GameObject>();
-            List<GameObject> rightWalls = new List<GameObject>();
-            List<GameObject> frontWalls = new List<GameObject>();
-            List<GameObject> backWalls = new List<GameObject>();
-            List<GameObject> sharedWalls = new List<GameObject>();
+            cell.sharerdWalls.Clear();
 
-            // loop through all of the neighboring cells
-            foreach (MazeCell neighbor in cell.neighboringCells)
+            bool frontWall = false;
+            if (cell.FrontWall.gameObject.activeSelf || (cell.FrontNeighbor != null && cell.FrontNeighbor.BackWall.gameObject.activeSelf))
             {
-                if (neighbor.hasLeftWall)
-                {
-                    leftWalls.Add(neighbor.LeftWall);
-                }
-                if (neighbor.hasRightWall)
-                {
-                    rightWalls.Add(neighbor.RightWall);
-                }
-                if (neighbor.hasFrontWall)
-                {
-                    frontWalls.Add(neighbor.FrontWall);
-                }
-                if (neighbor.hasBackWall)
-                {
-                    backWalls.Add(neighbor.BackWall);
-                }
+                frontWall = true;
+                if (cell.FrontWall.gameObject.activeSelf) cell.sharerdWalls.Add(cell.FrontWall);
+                if (cell.FrontNeighbor != null && cell.FrontNeighbor.BackWall.gameObject.activeSelf) cell.sharerdWalls.Add(cell.FrontNeighbor.BackWall);
             }
-            foreach (GameObject wall in leftWalls)
+            bool backWall = false;
+            if (cell.BackWall.gameObject.activeSelf || (cell.BackNeighbor != null && cell.BackNeighbor.FrontWall.gameObject.activeSelf))
             {
-                if (cell.hasLeftWall && (Vector3.Distance(cell.LeftWall.transform.position, wall.transform.position) <= 0.2))
-                {
-                    sharedWalls.Add(wall);
-                }
+                backWall = true;
+                if (cell.BackWall.gameObject.activeSelf) cell.sharerdWalls.Add(cell.BackWall);
+                if (cell.BackNeighbor != null && cell.BackNeighbor.FrontWall.gameObject.activeSelf) cell.sharerdWalls.Add(cell.BackNeighbor.FrontWall);
             }
-            foreach (GameObject wall in rightWalls)
+
+
+            bool leftWall = false;
+            if (cell.LeftWall.gameObject.activeSelf || (cell.LeftNeighbor != null && cell.LeftNeighbor.RightWall.gameObject.activeSelf))
             {
-                if (cell.hasRightWall && (Vector3.Distance(cell.RightWall.transform.position, wall.transform.position) <= 0.2))
-                {
-                    sharedWalls.Add(wall);
-                }
+                leftWall = true;
+                if (cell.LeftWall.gameObject.activeSelf) cell.sharerdWalls.Add(cell.LeftWall);
+                if (cell.LeftNeighbor != null && cell.LeftNeighbor.RightWall.gameObject.activeSelf) cell.sharerdWalls.Add(cell.LeftNeighbor.RightWall);
             }
-            foreach (GameObject wall in frontWalls)
+            bool rightWall = false;
+            if (cell.RightWall.gameObject.activeSelf || (cell.RightNeighbor != null && cell.RightNeighbor.LeftWall.gameObject.activeSelf))
             {
-                if (cell.hasFrontWall && (Vector3.Distance(cell.FrontWall.transform.position, wall.transform.position) <= 0.2))
-                {
-                    sharedWalls.Add(wall);
-                }
+                rightWall = true;
+                if (cell.RightWall.gameObject.activeSelf) cell.sharerdWalls.Add(cell.RightWall);
+                if (cell.RightNeighbor != null && cell.RightNeighbor.LeftWall.gameObject.activeSelf) cell.sharerdWalls.Add(cell.RightNeighbor.LeftWall);
             }
-            foreach (GameObject wall in backWalls)
+
+            if (frontWall && backWall && leftWall && rightWall)
             {
-                if (cell.hasBackWall && (Vector3.Distance(cell.BackWall.transform.position, wall.transform.position) <= 0.2))
-                {
-                    sharedWalls.Add(wall);
-                }
-            }
-            if (sharedWalls.Count == 4)
-            {
+                cell.isIsolatedCell = true;
                 isolatedCells.Add(cell);
+                specialCells.Add(cell);
             }
         }
+        Debug.Log("Isolated Cells: " + isolatedCells.Count);
 
+        foreach (MazeCell cell in isolatedCells)
+        {
+            int randomBarrier = Random.Range(0, cell.sharerdWalls.Count);
+            MazeBarrier barrier = cell.sharerdWalls[randomBarrier];
+            barrier.isBreakableBarrier = true;
+            barrier.GetComponentInChildren<MeshRenderer>().material.color = breakableBarrierColor;
+            breakableBarriers.Add(barrier);
+        }
+    }
+
+    public void InitializeNavMesh()
+    {
+        NavMeshSurface[] surfaces = FindObjectsByType<NavMeshSurface>(FindObjectsSortMode.None);
+
+        foreach (NavMeshSurface surface in surfaces)
+        {
+            surface.BuildNavMesh();
+            surface.UpdateNavMesh(surface.navMeshData);
+        }
     }
 
     public MazeCell GetRandomCell(bool isBoundaryCell)
     {
         if (isBoundaryCell)
         {
+            if (boudaryCells.Count == 0)
+            {
+                return cells[Random.Range(0, cells.Count)];
+            }
             return boudaryCells[Random.Range(0, boudaryCells.Count)];
         }
         else
