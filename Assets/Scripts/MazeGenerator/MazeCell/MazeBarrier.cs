@@ -4,6 +4,7 @@ public class MazeBarrier : MonoBehaviour
 {
     public bool isBoundaryBarrier = false;
     public bool isBreakableBarrier = false;
+    public bool isTrulyBreakableBarrier = false;
     public MazeCell myParentCell;
     public BoxCollider barrierCollider;
     public MeshRenderer barrierRenderer;

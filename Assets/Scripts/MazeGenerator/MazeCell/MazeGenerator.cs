@@ -33,7 +33,6 @@ public class MazeGenerator : MonoBehaviour
     [SerializeField] GameObject mazeCell;
     [SerializeField] private float mazeWallHeight = 1.0f;
     private Vector3 mazePrefabScale = new Vector3(1, 1, 1);
-    [SerializeField] MazeTester tester;
 
     [Header("Boundary Cell Settings")]
     [SerializeField] Color boundaryCellColor;

@@ -75,16 +75,9 @@ public class Maze : MonoBehaviour
             {
                 InitializeSpecialCells();
                 levelIsReady = true;
-                InitializeNavMesh();
-                GameObject test = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                test.GetComponent<MeshRenderer>().material.color = breakableBarrierColor;
-                test.transform.localScale = test.transform.localScale / 4;
-                Vector3 spot = new Vector3(startingCell.transform.position.x, startingCell.transform.position.y + startingCell.transform.position.y, startingCell.transform.position.z);
-                Instantiate(test, spot, Quaternion.identity);
-                test.AddComponent<MazeTester>();
-                test.AddComponent<NavMeshAgent>();
-                test.AddComponent<Rigidbody>().useGravity = true;
-                test.GetComponent<MazeTester>().agent = test.GetComponent<NavMeshAgent>();
+                //InitializeNavMesh();
+                //navMeshSurface.enabled = true;
+                //navMeshSurface.BuildNavMesh();
             }
         }
         if (hideTopFloor)
@@ -291,7 +284,6 @@ public class Maze : MonoBehaviour
 
         foreach (NavMeshSurface surface in surfaces)
         {
-            surface.BuildNavMesh();
             surface.UpdateNavMesh(surface.navMeshData);
         }
     }
