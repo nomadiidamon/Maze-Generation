@@ -1,16 +1,11 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class BreakableSegment : MonoBehaviour
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
+    public List<BreakableBit> _my_ChildBits = new List<BreakableBit>();
+    public List<BreakableColumn> _my_ChildColumns = new List<BreakableColumn>();
+    public List<BreakableChunk> _my_ChildChunks = new List<BreakableChunk>();
+    public BreakableBarrier _my_ParentBarrier;
+    public MazeCell _my_ParentCell;
 }
